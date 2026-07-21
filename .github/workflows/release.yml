@@ -26,12 +26,13 @@ jobs:
         with:
           go-version: '1.22' # Ajusta a la versión de Go que estés usando
 
-      # 2. Configurar Node.js (para tu Frontend)
+      # 2. Configurar Node.js indicando la ruta del lockfile
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm' # O pnpm/yarn según tu gestor de paquetes
+          cache: 'npm'
+          cache-dependency-path: 'frontend/package-lock.json' # Ajusta 'frontend' a la ruta exacta de tu subcarpeta
 
       # 3. Compilar el Backend en Go como Sidecar de Tauri
       - name: Build Go Sidecar
