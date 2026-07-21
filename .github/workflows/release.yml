@@ -38,7 +38,7 @@ jobs:
       - name: Build Go Sidecar
         run: |
           cd backend/cmd/api
-          go build -o ../../../frontend/src-tauri/binaries/orbit-api-x86_64-pc-windows-msvc.exe main.go
+          go build -o ../../../frontend/src-tauri/orbit-api-x86_64-pc-windows-msvc.exe main.go
 
       # 4. Instalar dependencias del Frontend dentro de /frontend
       - name: Install frontend dependencies

@@ -756,7 +756,7 @@ fn delete_historial(app_handle: AppHandle, id: i64) -> Result<(), String> {
 fn main() {
     tauri::Builder::default()
         .setup(|app| {
-            match Command::new_sidecar("binaries/orbit-api") {
+            match Command::new_sidecar("orbit-api") {
                 Ok(cmd) => {
                     match cmd.spawn() {
                         Ok((mut rx, mut _child)) => {
