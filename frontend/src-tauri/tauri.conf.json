@@ -39,6 +39,15 @@
       },
       "app": {
         "all": true
+      },
+      "shell": {
+        "sidecar": true,
+        "scope": [
+          {
+            "name": "binaries/orbit-api",
+            "sidecar": true
+          }
+        ]
       }
     },
     "bundle": {

@@ -17,7 +17,7 @@ tauri-build = { version = "1.5.5", features = [] }
 [dependencies]
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
-tauri = { version = "1.8.1", features = [ "app-all", "process-relaunch", "updater", "dialog-all", "protocol-all", "fs-all", "path-all" ] }
+tauri = { version = "1.8.1", features = [ "app-all", "process-relaunch", "updater", "dialog-all", "protocol-all", "fs-all", "path-all", "shell-sidecar" ] }
 chrono = "0.4"
 
 [features]
