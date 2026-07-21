@@ -134,3 +134,38 @@
 }
 
 .errorBtn { background-color: $color-secondary; &:hover { filter: brightness(1.2); } }
+
+.cardAvatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-size: cover;
+  background-position: center;
+  border: 1px solid $color-border;
+}
+
+.imageUploadContainer {
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+  margin-top: $spacing-xs;
+}
+
+.imagePreview {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background-size: cover;
+  background-position: center;
+  border: 2px solid $color-border;
+  background-color: $color-bg-sidebar;
+}
+
+.fileInput {
+  background-color: transparent;
+  color: $color-text-secondary;
+  border: none;
+  font-size: 0.85rem;
+  padding: 0;
+  &:hover { color: $color-primary; cursor: pointer; }
+}

@@ -6,7 +6,7 @@
     "distDir": "../dist"
   },
   "package": {
-    "productName": "GeminiUI",
+    "productName": "Orbit",
     "version": "0.1.0"
   },
   "tauri": {
@@ -45,7 +45,7 @@
         "icons/icon.icns",
         "icons/icon.ico"
       ],
-      "identifier": "com.tauri.dev",
+      "identifier": "com.orbit.app",
       "longDescription": "",
       "macOS": {
         "entitlements": null,
@@ -74,7 +74,7 @@
         "fullscreen": false,
         "height": 600,
         "resizable": true,
-        "title": "Gemini Desktop",
+        "title": "Orbit",
         "width": 800
       }
     ]

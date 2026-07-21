@@ -5,7 +5,7 @@ import SettingsPage from './pages/SettingsPage/SettingsPage';
 import PersonalityPage from './pages/PersonalityPage/PersonalityPage';
 import styles from './App.module.scss';
 import useSettingsStore from './store/settingsStore';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { convertFileSrc } from '@tauri-apps/api/tauri';
 
 // Detectar entorno Tauri
@@ -26,6 +26,26 @@ function App() {
     }
   }, [loadBgSettingsFromBackend, loadIconSettingsFromBackend]);
 
+  const [showSplash, setShowSplash] = useState(true);
+  const [isFadingOut, setIsFadingOut] = useState(false);
+
+  useEffect(() => {
+    // Iniciar desvanecimiento a los 9 segundos
+    const fadeTimer = setTimeout(() => {
+      setIsFadingOut(true);
+    }, 9000);
+
+    // Desmontar completamente a los 10 segundos
+    const removeTimer = setTimeout(() => {
+      setShowSplash(false);
+    }, 10000);
+
+    return () => {
+      clearTimeout(fadeTimer);
+      clearTimeout(removeTimer);
+    };
+  }, []);
+
   // Construir la URL del fondo (data:image o local filesystem via Tauri)
   let backgroundUrl = 'none';
   if (bgPath) {
@@ -43,6 +63,15 @@ function App() {
           opacity: bgOpacity / 100
         }}
       />
+      
+      {showSplash && (
+        <div className={`${styles.splashScreen} ${isFadingOut ? styles.fadeOut : ''}`}>
+          <h1 className={styles.splashTitle}>Orbit</h1>
+          <p className={styles.splashDisclaimer}>
+            Disclaimer: Orbit is an independent open-source project and is not affiliated with, sponsored, or endorsed by Google LLC.
+          </p>
+        </div>
+      )}
       
       <div className={styles.appLayout}>
         <Sidebar />

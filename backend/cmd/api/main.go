@@ -5,11 +5,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"gemini-desktop-backend/internal/config"
-	"gemini-desktop-backend/internal/handler"
-	"gemini-desktop-backend/internal/middleware"
-	"gemini-desktop-backend/internal/repository"
-	"gemini-desktop-backend/internal/service"
+	"orbit-backend/internal/config"
+	"orbit-backend/internal/handler"
+	"orbit-backend/internal/middleware"
+	"orbit-backend/internal/repository"
+	"orbit-backend/internal/service"
 )
 
 func main() {
@@ -20,12 +20,13 @@ func main() {
 	repo := repository.NewSupabaseRepo(cfg.SupabaseURL, cfg.SupabasePassword)
 
 	// 3. Inicializar Servicio (Gemini) - Inyectamos repositorio
-	aiService := service.NewAIService(cfg.GoogleAPIKey, repo)
+	aiService := service.NewAIService(cfg.GoogleAPIKey, repo, repo)
 
 	// 4. Inicializar Handlers
 	chatHandler := handler.NewChatHandler(aiService)
 	personalityHandler := handler.NewPersonalityHandler(repo)
 	systemHandler := handler.NewSystemHandler(cfg.GoogleAPIKey)
+	historialHandler := handler.NewHistorialHandler(repo)
 
 	// 5. Configurar el Servidor y Enrutador Gin
 	gin.SetMode(gin.ReleaseMode) // Cambiar a gin.DebugMode si necesitas ver los logs detallados
@@ -60,6 +61,10 @@ func main() {
 		api.GET("/personalities", personalityHandler.GetAll)
 		api.POST("/personalities", personalityHandler.Create)
 		api.PUT("/personalities/:id", personalityHandler.Update)
+
+		// CRUD Historial
+		api.GET("/historial", historialHandler.GetAll)
+		api.DELETE("/historial/:id", historialHandler.Delete)
 	}
 
 	// 6. Iniciar Servidor

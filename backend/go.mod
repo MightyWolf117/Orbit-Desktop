@@ -1,4 +1,4 @@
-module gemini-desktop-backend
+module orbit-backend
 
 go 1.26.5
 

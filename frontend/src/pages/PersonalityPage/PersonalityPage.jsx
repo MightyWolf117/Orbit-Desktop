@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
 import { PlusCircle, Edit3, UserCircle, Save } from 'lucide-react';
 import Modal from '../../components/common/Modal/Modal';
+import { invoke, convertFileSrc } from '@tauri-apps/api/tauri';
 import { ENDPOINTS } from '../../service/api';
 import styles from './PersonalityPage.module.scss';
+
+const isTauri = typeof window !== 'undefined' && window.__TAURI_IPC__ !== undefined;
 
 const PersonalityPage = () => {
   const [personalities, setPersonalities] = useState([]);
@@ -13,7 +16,9 @@ const PersonalityPage = () => {
   const [editingId, setEditingId] = useState(null);
   
   // Form State
-  const [formData, setFormData] = useState({ nombre: '', descripcion_corta: '', instrucciones: '' });
+  const [formData, setFormData] = useState({ nombre: '', descripcion_corta: '', instrucciones: '', image: null });
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
 
   const [alert, setAlert] = useState({ isOpen: false, title: '', message: '', isError: false });
 
@@ -23,7 +28,23 @@ const PersonalityPage = () => {
       const response = await fetch(ENDPOINTS.PERSONALITIES);
       if (response.ok) {
         const data = await response.json();
-        setPersonalities(data || []);
+        
+        if (isTauri) {
+          const processedData = await Promise.all(data.map(async (p) => {
+            if (p.image) {
+              try {
+                const fullPath = await invoke('get_personality_image_path', { filename: p.image });
+                return { ...p, localImageUrl: convertFileSrc(fullPath) };
+              } catch (e) {
+                return p;
+              }
+            }
+            return p;
+          }));
+          setPersonalities(processedData || []);
+        } else {
+          setPersonalities(data || []);
+        }
       }
     } catch (e) {
       console.error("Error fetching personalities:", e);
@@ -36,20 +57,49 @@ const PersonalityPage = () => {
     fetchPersonalities();
   }, []);
 
+  const loadPersonalityImagePreview = async (imageFilename) => {
+    if (!imageFilename || !isTauri) return null;
+    try {
+      const fullPath = await invoke('get_personality_image_path', { filename: imageFilename });
+      return convertFileSrc(fullPath);
+    } catch (e) {
+      console.error("Error loading image path:", e);
+      return null;
+    }
+  };
+
   const openNewModal = () => {
     setEditingId(null);
-    setFormData({ nombre: '', descripcion_corta: '', instrucciones: '' });
+    setFormData({ nombre: '', descripcion_corta: '', instrucciones: '', image: null });
+    setSelectedFile(null);
+    setPreviewUrl(null);
     setIsModalOpen(true);
   };
 
-  const openEditModal = (p) => {
+  const openEditModal = async (p) => {
     setEditingId(p.id);
     setFormData({ 
       nombre: p.nombre || '', 
       descripcion_corta: p.descripcion_corta || '', 
-      instrucciones: p.instrucciones || '' 
+      instrucciones: p.instrucciones || '',
+      image: p.image || null
     });
+    setSelectedFile(null);
+    setPreviewUrl(null);
     setIsModalOpen(true);
+
+    if (p.image) {
+      const url = await loadPersonalityImagePreview(p.image);
+      setPreviewUrl(url);
+    }
+  };
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setSelectedFile(file);
+      setPreviewUrl(URL.createObjectURL(file));
+    }
   };
 
   const handleSave = async () => {
@@ -59,6 +109,25 @@ const PersonalityPage = () => {
     }
 
     try {
+      let finalFormData = { ...formData };
+      
+      if (selectedFile) {
+        if (isTauri) {
+           const arrayBuffer = await selectedFile.arrayBuffer();
+           const bytes = Array.from(new Uint8Array(arrayBuffer));
+           const extension = selectedFile.name.split('.').pop();
+           const filename = `persona_${Date.now()}.${extension}`;
+           
+           const savedFilename = await invoke('save_personality_image', {
+             imageBytes: bytes,
+             filename: filename
+           });
+           finalFormData.image = savedFilename;
+        } else {
+           console.warn("Tauri no está disponible, no se guardará la imagen.");
+        }
+      }
+
       const isEdit = editingId !== null;
       const url = isEdit ? `${ENDPOINTS.PERSONALITIES}/${editingId}` : ENDPOINTS.PERSONALITIES;
       const method = isEdit ? 'PUT' : 'POST';
@@ -66,7 +135,7 @@ const PersonalityPage = () => {
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(finalFormData)
       });
 
       if (response.ok) {
@@ -102,7 +171,11 @@ const PersonalityPage = () => {
             <div key={p.id} className={styles.card}>
               <div className={styles.cardHeader}>
                 <div className={styles.cardTitle}>
-                  <UserCircle size={24} className={styles.cardIcon} />
+                  {p.localImageUrl ? (
+                    <div className={styles.cardAvatar} style={{backgroundImage: `url(${p.localImageUrl})`}} />
+                  ) : (
+                    <UserCircle size={24} className={styles.cardIcon} />
+                  )}
                   <h3>{p.nombre}</h3>
                 </div>
                 <button className={styles.editBtn} onClick={() => openEditModal(p)} title="Editar">
@@ -132,6 +205,23 @@ const PersonalityPage = () => {
           </>
         }
       >
+        <div className={styles.formGroup}>
+          <label>Imagen de Perfil</label>
+          <div className={styles.imageUploadContainer}>
+            <div 
+              className={styles.imagePreview} 
+              style={previewUrl ? { backgroundImage: `url(${previewUrl})` } : {}}
+            >
+              {!previewUrl && <UserCircle size={44} className={styles.cardIcon} style={{margin: '0'}}/>}
+            </div>
+            <input 
+              type="file" 
+              accept="image/*" 
+              onChange={handleImageChange} 
+              className={styles.fileInput}
+            />
+          </div>
+        </div>
         <div className={styles.formGroup}>
           <label>Nombre de la Personalidad *</label>
           <input 

@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"gemini-desktop-backend/internal/domain"
+	"orbit-backend/internal/domain"
 )
 
 type SupabaseRepo struct {
@@ -18,7 +18,11 @@ type SupabaseRepo struct {
 	client   *http.Client
 }
 
-func NewSupabaseRepo(url, password string) domain.PersonalityRepository {
+// Aseguramos en tiempo de compilación que cumple ambas interfaces
+var _ domain.PersonalityRepository = (*SupabaseRepo)(nil)
+var _ domain.HistorialRepository = (*SupabaseRepo)(nil)
+
+func NewSupabaseRepo(url, password string) *SupabaseRepo {
 	return &SupabaseRepo{
 		url:      url,
 		password: password,
@@ -225,6 +229,110 @@ func (r *SupabaseRepo) UpdatePersonality(id int, p *domain.Personality) error {
 	log.Printf("[Supabase PATCH UpdatePersonality] Response Status: %d, Body: %s", resp.StatusCode, string(bodyBytes))
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("supabase devolvió estado no exitoso: %d, body: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	return nil
+}
+
+// Historial Methods
+
+func (r *SupabaseRepo) GetHistorials() ([]domain.Historial, error) {
+	reqUrl := fmt.Sprintf("%s/historial?select=*&order=created_at.desc", r.url)
+	
+	req, err := http.NewRequest(http.MethodGet, reqUrl, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error creando petición: %w", err)
+	}
+
+	req.Header.Set("apikey", r.password)
+	req.Header.Set("Authorization", "Bearer "+r.password)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := r.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error al hacer petición a supabase: %w", err)
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error leyendo respuesta: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("supabase devolvió estado no exitoso: %d, body: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	var historiales []domain.Historial
+	if err := json.Unmarshal(bodyBytes, &historiales); err != nil {
+		return nil, fmt.Errorf("error decodificando respuesta: %w", err)
+	}
+
+	return historiales, nil
+}
+
+func (r *SupabaseRepo) CreateHistorial(h *domain.Historial) error {
+	jsonData, err := json.Marshal(h)
+	if err != nil {
+		return fmt.Errorf("error codificando historial: %w", err)
+	}
+
+	reqUrl := fmt.Sprintf("%s/historial", r.url)
+	req, err := http.NewRequest(http.MethodPost, reqUrl, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return fmt.Errorf("error creando petición: %w", err)
+	}
+
+	req.Header.Set("apikey", r.password)
+	req.Header.Set("Authorization", "Bearer "+r.password)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Prefer", "return=representation")
+	
+	resp, err := r.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("error al hacer petición a supabase: %w", err)
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("error leyendo respuesta: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("supabase devolvió estado no exitoso: %d, body: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	// Actualizar el ID generado
+	var inserted []domain.Historial
+	if err := json.Unmarshal(bodyBytes, &inserted); err == nil && len(inserted) > 0 {
+		h.ID = inserted[0].ID
+		h.CreatedAt = inserted[0].CreatedAt
+	}
+
+	return nil
+}
+
+func (r *SupabaseRepo) DeleteHistorial(id int) error {
+	reqUrl := fmt.Sprintf("%s/historial?id=eq.%d", r.url, id)
+	
+	req, err := http.NewRequest(http.MethodDelete, reqUrl, nil)
+	if err != nil {
+		return fmt.Errorf("error creando petición: %w", err)
+	}
+
+	req.Header.Set("apikey", r.password)
+	req.Header.Set("Authorization", "Bearer "+r.password)
+
+	resp, err := r.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("error al hacer petición a supabase: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
+		bodyBytes, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("supabase devolvió estado no exitoso: %d, body: %s", resp.StatusCode, string(bodyBytes))
 	}
 

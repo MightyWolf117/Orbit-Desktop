@@ -3,10 +3,11 @@ import { PlusCircle, Settings, MessageSquare, Trash2, Users } from 'lucide-react
 import { useEffect } from 'react';
 import useChatStore from '../../store/chatStore';
 import useSettingsStore from '../../store/settingsStore';
+import { ENDPOINTS } from '../../service/api';
 import styles from './Sidebar.module.scss';
 
 const Sidebar = () => {
-  const { chats, activeChatId, setActiveChat, createNewChat, deleteChat } = useChatStore();
+  const { chats, setChats, activeChatId, setActiveChat, createNewChat, deleteChat } = useChatStore();
   const { isOnline, checkHealth } = useSettingsStore();
   const location = useLocation();
 
@@ -14,19 +15,34 @@ const Sidebar = () => {
     createNewChat();
   };
 
-  // Polling para el Health Check cada 30 segundos
+  useEffect(() => {
+    const fetchHistorial = async () => {
+      try {
+        const response = await fetch(`${ENDPOINTS.HISTORIAL}`);
+        if (response.ok) {
+          const historiales = await response.json();
+          setChats(historiales || []);
+        }
+      } catch (e) {
+        console.error("Error fetching historial", e);
+      }
+    };
+    fetchHistorial();
+  }, [setChats]);
+
+  // Polling para el Health Check cada 5 minutos
   useEffect(() => {
     checkHealth(); // Ejecutar inmediatamente
     const interval = setInterval(() => {
       checkHealth();
-    }, 30000);
+    }, 300000);
     return () => clearInterval(interval);
   }, [checkHealth]);
 
   return (
     <div className={styles.sidebar}>
       <div className={styles.header}>
-        <h2 className={styles.title}>Gemini UI</h2>
+        <h2 className={styles.title}>Orbit</h2>
         <Link to="/" className={styles.newChatBtn} onClick={handleNewChat}>
           <PlusCircle size={20} />
           <span>Nuevo Chat</span>
@@ -47,8 +63,27 @@ const Sidebar = () => {
             </Link>
             <button 
               className={styles.deleteBtn} 
-              onClick={(e) => {
+              onClick={async (e) => {
                 e.stopPropagation();
+                const deleteLocal = window.confirm("¿Deseas eliminar también los archivos locales de este chat?");
+                
+                if (chat.dbId) {
+                  try {
+                    await fetch(`${ENDPOINTS.HISTORIAL}/${chat.dbId}`, { method: 'DELETE' });
+                  } catch (err) {
+                    console.error("Error eliminando historial en nube:", err);
+                  }
+                }
+                
+                if (deleteLocal && typeof window !== 'undefined' && window.__TAURI_IPC__) {
+                  const { invoke } = await import('@tauri-apps/api/tauri');
+                  try {
+                    await invoke('delete_local_chat', { chat_code: parseInt(chat.id) });
+                  } catch (err) {
+                    console.error("Error eliminando chat local:", err);
+                  }
+                }
+
                 deleteChat(chat.id);
               }}
               title="Eliminar chat"
@@ -63,7 +98,11 @@ const Sidebar = () => {
       </div>
 
       <div className={styles.footer}>
-        <div className={styles.healthIndicator} title={isOnline ? "Backend Conectado" : "Backend Desconectado"}>
+        <div 
+          className={styles.healthIndicator} 
+          title={isOnline ? "Backend Conectado (Click para refrescar)" : "Backend Desconectado (Click para reintentar)"}
+          onClick={checkHealth}
+        >
           <div className={`${styles.dot} ${isOnline ? styles.online : styles.offline}`}></div>
           <span>{isOnline ? 'Servicio en línea' : 'Servicio offline'}</span>
         </div>

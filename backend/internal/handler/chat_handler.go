@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"gemini-desktop-backend/internal/domain"
+	"orbit-backend/internal/domain"
 )
 
 type ChatHandler struct {
@@ -42,7 +42,5 @@ func (h *ChatHandler) HandleChat(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, domain.ChatResponse{
-		Response: response,
-	})
+	c.JSON(http.StatusOK, response)
 }

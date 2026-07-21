@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/generative-ai-go/genai"
@@ -46,11 +47,14 @@ func (h *SystemHandler) Models(c *gin.Context) {
 			break
 		}
 		
-		// Guardamos el modelo en nuestra lista. 
-		// Como acordamos, añadimos el estado "Activo". Si hay problema de cuota,
-		// se reflejará al intentar usarlo.
+		// Filtramos para asegurar que sean modelos de generación de texto usables para chat
+		name := m.Name
+		if !strings.HasPrefix(name, "models/gemini") || strings.Contains(name, "vision") || strings.Contains(name, "embedding") {
+			continue
+		}
+
 		availableModels = append(availableModels, map[string]string{
-			"id":           m.Name,
+			"id":           name,
 			"displayName":  m.DisplayName,
 			"description":  m.Description,
 			"status":       "Activo", 

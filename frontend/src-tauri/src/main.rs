@@ -15,6 +15,23 @@ struct BgConfig {
     opacity: u8,
 }
 
+#[derive(Serialize, Deserialize)]
+struct Config {
+    openai_api_key: String,
+    gemini_api_key: String,
+    anthropic_api_key: String,
+    ai_model: String,
+    temperature: String,
+}
+
+#[derive(Serialize, Deserialize)]
+struct ChatMessage {
+    id: i64,
+    sender: String,
+    text: String,
+    timestamp: i64,
+}
+
 #[derive(Serialize, Deserialize, Clone, Default)]
 struct IconConfig {
     user_icon_path: Option<String>,
@@ -146,6 +163,124 @@ fn save_icon_image(
     Ok(icon_dir.to_string_lossy().to_string())
 }
 
+#[tauri::command]
+fn save_personality_image(
+    app_handle: AppHandle,
+    image_bytes: Vec<u8>,
+    filename: String,
+) -> Result<String, String> {
+    if image_bytes.len() > 5 * 1024 * 1024 {
+        return Err("La imagen excede el límite de 5MB".into());
+    }
+
+    let mut dir = get_app_data_dir(&app_handle)?;
+    dir.push("assets");
+    dir.push("personalities");
+
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    dir.push(&filename);
+
+    fs::write(&dir, image_bytes).map_err(|e| e.to_string())?;
+    Ok(filename)
+}
+
+#[tauri::command]
+fn get_personality_image_path(
+    app_handle: AppHandle,
+    filename: String,
+) -> Result<String, String> {
+    let mut dir = get_app_data_dir(&app_handle)?;
+    dir.push("assets");
+    dir.push("personalities");
+    dir.push(&filename);
+    
+    Ok(dir.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+fn save_chat_message(
+    app_handle: AppHandle,
+    chat_code: i64,
+    message_order: i32,
+    message: ChatMessage,
+) -> Result<(), String> {
+    let mut dir = get_app_data_dir(&app_handle)?;
+    dir.push("assets");
+    dir.push("chats");
+    dir.push(chat_code.to_string());
+
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+
+    let filename = format!("{}.json", message_order);
+    dir.push(&filename);
+
+    let json_data = serde_json::to_string(&message).map_err(|e| e.to_string())?;
+    fs::write(&dir, json_data).map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+fn get_chat_messages(
+    app_handle: AppHandle,
+    chat_code: i64,
+) -> Result<Vec<ChatMessage>, String> {
+    let mut dir = get_app_data_dir(&app_handle)?;
+    dir.push("assets");
+    dir.push("chats");
+    dir.push(chat_code.to_string());
+
+    let mut messages = Vec::new();
+
+    if dir.exists() && dir.is_dir() {
+        let entries = fs::read_dir(&dir).map_err(|e| e.to_string())?;
+        
+        let mut files: Vec<(i32, std::path::PathBuf)> = Vec::new();
+
+        for entry in entries {
+            if let Ok(entry) = entry {
+                let path = entry.path();
+                if path.extension().and_then(|e| e.to_str()) == Some("json") {
+                    if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                        if let Ok(order) = stem.parse::<i32>() {
+                            files.push((order, path));
+                        }
+                    }
+                }
+            }
+        }
+
+        files.sort_by_key(|k| k.0);
+
+        for (_, path) in files {
+            if let Ok(content) = fs::read_to_string(&path) {
+                if let Ok(msg) = serde_json::from_str::<ChatMessage>(&content) {
+                    messages.push(msg);
+                }
+            }
+        }
+    }
+
+    Ok(messages)
+}
+
+#[tauri::command]
+fn delete_local_chat(
+    app_handle: AppHandle,
+    chat_code: i64,
+) -> Result<(), String> {
+    let mut dir = get_app_data_dir(&app_handle)?;
+    dir.push("assets");
+    dir.push("chats");
+    dir.push(chat_code.to_string());
+
+    if dir.exists() {
+        fs::remove_dir_all(&dir).map_err(|e| e.to_string())?;
+    }
+    
+    Ok(())
+}
+
 fn main() {
     tauri::Builder::default()
         .setup(|app| {
@@ -162,6 +297,14 @@ fn main() {
                 path.pop();
                 path.push("icons");
                 let _ = fs::create_dir_all(&path);
+
+                path.pop();
+                path.push("personalities");
+                let _ = fs::create_dir_all(&path);
+
+                path.pop();
+                path.push("chats");
+                let _ = fs::create_dir_all(&path);
             }
             Ok(())
         })
@@ -171,7 +314,12 @@ fn main() {
             save_background_image,
             save_icon_config,
             load_icon_config,
-            save_icon_image
+            save_icon_image,
+            save_personality_image,
+            get_personality_image_path,
+            save_chat_message,
+            get_chat_messages,
+            delete_local_chat
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

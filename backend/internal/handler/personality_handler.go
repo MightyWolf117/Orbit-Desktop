@@ -6,7 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"gemini-desktop-backend/internal/domain"
+	"orbit-backend/internal/domain"
 )
 
 type PersonalityHandler struct {
